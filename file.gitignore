@@ -1,5 +1,0 @@
-cd D:\labo\projet
-git rm -r --cached .
-git add .
-git commit -m "Add gitignore and remove environment files"
-git push

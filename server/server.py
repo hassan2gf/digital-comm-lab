@@ -1,37 +1,43 @@
-import socket, json, copy
-import numpy as np
-from tps import tp1, fourier
+import socket
+import json
+import copy
+from labs import lab1_signals, fourier_series
 
 PORT = 5000
-TPS = {"tp1": tp1, "fourier": fourier}
+LABS = {
+    "lab1": lab1_signals,
+    "fourier": fourier_series,
+}
 
-def servir(conn):
-    tampon = b""
+def handle(connection):
+    buffer = b""
     while True:
-        data = conn.recv(65536)
+        data = connection.recv(65536)
         if not data:
-            raise ConnectionError
-        tampon += data
-        while b"\n" in tampon:
-            ligne, tampon = tampon.split(b"\n", 1)
-            requete = json.loads(ligne)
-            module = TPS[requete["tp"]]
-            params = copy.deepcopy(module.DEFAUT)
-            params.update(requete.get("params", {}))
-            reponse = module.calculer(params)
-            reponse["tp"] = requete["tp"]
-            conn.sendall((json.dumps(reponse) + "\n").encode())
+            raise ConnectionError("client closed")
+        buffer += data
+        while b"\n" in buffer:
+            line, buffer = buffer.split(b"\n", 1)
+            request = json.loads(line)
+            module = LABS[request["lab"]]
+            settings = copy.deepcopy(module.DEFAULTS)
+            settings.update(request.get("settings", {}))
+            answer = module.compute(settings)
+            answer["lab"] = request["lab"]
+            connection.sendall((json.dumps(answer) + "\n").encode())
 
-serveur = socket.socket()
-serveur.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-serveur.bind(("0.0.0.0", PORT))
-serveur.listen(1)
+server = socket.socket()
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+server.bind(("0.0.0.0", PORT))
+server.listen(1)
+print("Server ready on port", PORT)
+
 while True:
-    print("En attente du PC...")
-    conn, adresse = serveur.accept()
-    print("PC connecté :", adresse)
+    print("Waiting for a client...")
+    connection, address = server.accept()
+    print("Client connected:", address)
     try:
-        servir(conn)
-    except (ConnectionError, OSError, ValueError) as e:
-        print("Déconnexion :", e)
-    conn.close()
+        handle(connection)
+    except (ConnectionError, OSError, ValueError, KeyError) as error:
+        print("Disconnected:", error)
+    connection.close()

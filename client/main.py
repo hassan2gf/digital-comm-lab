@@ -7,6 +7,7 @@ from network import Network
 from home_page import HomePage
 from panels.lab1_panel import Lab1
 from panels.lab2_panel import Lab2
+from panels.lab3_panel import Lab3
 
 
 SERVER_HOST = "127.0.0.1"          # "127.0.0.1" on the Pi itself
@@ -22,10 +23,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.home = HomePage(BASE)
         self.lab1 = Lab1()
         self.lab2 = Lab2()
+        self.lab3 = Lab3()
         self.pages = QtWidgets.QStackedWidget()
         self.pages.addWidget(self.home)          # index 0
         self.pages.addWidget(self.wrap(self.lab1, "Lab 1 - Signals and Spectrum"))
         self.pages.addWidget(self.wrap(self.lab2, "Lab 2 - Line Coding"))
+        self.pages.addWidget(self.wrap(self.lab3, "Lab 3 - Power Spectral Density"))
         self.setCentralWidget(self.pages)
         self.home.chosen.connect(self.open_lab)
 
@@ -41,6 +44,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.network.result.connect(self.route)
         self.lab1.request.connect(self.network.send)
         self.lab2.request.connect(self.network.send)
+        self.lab3.request.connect(self.network.send)
 
         # ---------- 4. Shortcuts ----------
 
@@ -49,8 +53,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.add_shortcut("Ctrl+Q", self.close)
         self.add_shortcut("Ctrl+Shift+Q", self.power_off)
     def route(self, result):
-        if result.get("lab") == "lab2":
+        kind = result.get("lab")
+        if kind == "lab2":
             self.lab2.display(result)
+        elif kind == "lab3":
+            self.lab3.display(result)
         else:
             self.lab1.display(result)
 
@@ -80,16 +87,21 @@ class MainWindow(QtWidgets.QMainWindow):
         return page
 
     def open_lab(self, key):
+        self.lab2.stop()
+        self.lab3.stop()
         if key == "lab1":
-            self.lab2.stop()
             self.pages.setCurrentIndex(1)
             self.lab1.start()
         elif key == "lab2":
             self.pages.setCurrentIndex(2)
             self.lab2.start()
+        elif key == "lab3":
+            self.pages.setCurrentIndex(3)
+            self.lab3.start()
 
     def go_home(self):
         self.lab2.stop()
+        self.lab3.stop()
         self.pages.setCurrentIndex(0)
 
     def on_status(self, text):

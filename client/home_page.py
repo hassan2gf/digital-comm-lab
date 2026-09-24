@@ -13,7 +13,7 @@ LABS = [
     ("lab2", "Lab 2 - Line Coding",
      "NRZ, RZ, Manchester, Miller, AMI and HDB3", True),
     ("lab3", "Lab 3 - Power Spectral Density",
-     "Spectrum of line codes, averaging and bandwidth", False),
+     "Spectrum of line codes, averaging and bandwidth", True),
     ("lab4", "Lab 4 - Digital Modulation",
      "ASK, PSK, FSK, QAM, constellation and bit error rate", False),
 ]

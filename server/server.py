@@ -1,12 +1,14 @@
 import socket
 import json
 import copy
-from labs import lab1_signals, fourier_series
+from labs import lab1_signals, fourier_series, lab2_coding, lab3_psd
 
 PORT = 5000
 LABS = {
     "lab1": lab1_signals,
     "fourier": fourier_series,
+    "lab2": lab2_coding,
+    "lab3": lab3_psd,
 }
 
 def handle(connection):

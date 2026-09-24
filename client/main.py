@@ -5,6 +5,7 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 from network import Network
 from home_page import HomePage
 from panels.lab1_panel import Lab1
+from panels.lab2_panel import Lab2
 
 SERVER_HOST = "127.0.0.1"          # "127.0.0.1" on the Pi itself
 BASE = os.path.dirname(os.path.abspath(__file__)) + os.sep
@@ -18,9 +19,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # ---------- 1. Pages ----------
         self.home = HomePage(BASE)
         self.lab1 = Lab1()
+        self.lab2 = Lab2()
         self.pages = QtWidgets.QStackedWidget()
         self.pages.addWidget(self.home)          # index 0
         self.pages.addWidget(self.wrap(self.lab1, "Lab 1 - Signals and Spectrum"))
+        self.pages.addWidget(self.wrap(self.lab2, "Lab 2 - Line Coding"))
         self.setCentralWidget(self.pages)
         self.home.chosen.connect(self.open_lab)
 
@@ -29,16 +32,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar().addPermanentWidget(self.status_label)
 
         # ---------- 3. Network ----------
+        # ---------- 3. Network ----------
         self.network = Network(SERVER_HOST)
         self.network.status.connect(self.status_label.setText)
         self.network.status.connect(self.on_status)
-        self.network.result.connect(self.lab1.display)
+        self.network.result.connect(self.route)
         self.lab1.request.connect(self.network.send)
+        self.lab2.request.connect(self.network.send)
+
+        # ---------- 4. Shortcuts ----------
 
         # ---------- 4. Shortcuts ----------
         self.add_shortcut("Escape", self.go_home)
         self.add_shortcut("Ctrl+Q", self.close)
         self.add_shortcut("Ctrl+Shift+Q", self.power_off)
+    def route(self, result):
+        if result.get("lab") == "lab2":
+            self.lab2.display(result)
+        else:
+            self.lab1.display(result)
 
     def add_shortcut(self, keys, action):
         shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(keys), self)
@@ -67,10 +79,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def open_lab(self, key):
         if key == "lab1":
+            self.lab2.stop()
             self.pages.setCurrentIndex(1)
             self.lab1.start()
+        elif key == "lab2":
+            self.pages.setCurrentIndex(2)
+            self.lab2.start()
 
     def go_home(self):
+        self.lab2.stop()
         self.pages.setCurrentIndex(0)
 
     def on_status(self, text):

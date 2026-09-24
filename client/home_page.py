@@ -2,7 +2,7 @@ from PyQt5 import QtWidgets, QtCore, QtGui
 
 # ---------- 1. Texts to customize ----------
 TITLE = "Digital Communications Laboratory"
-SUBTITLE = "University of Batna - Department of Electronics"
+SUBTITLE = "Faculty of Technology - Department of Electronics"
 LOGO_FILE = "assets/logo.png"
 
 # ---------- 2. Lab list: (key, title, description, ready) ----------
@@ -10,7 +10,7 @@ LABS = [
     ("lab1", "Lab 1 - Signals and Spectrum",
      "Periodic signals, spectrum and Fourier series", True),
     ("lab2", "Lab 2 - Line Coding",
-     "NRZ, RZ, Manchester, AMI, HDB3 and power spectral density", False),
+     "NRZ, RZ, Manchester, AMI, HDB3 and power spectral density", True),
     ("lab3", "Lab 3 - Pulse Shaping",
      "Raised cosine filter, intersymbol interference and eye diagram", False),
     ("lab4", "Lab 4 - Digital Modulation",

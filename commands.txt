@@ -20,3 +20,31 @@ scp hassan@192.168.1.20:/home/hassan/.bash_profile D:\labo\projet\pi-setup\bash_
 To shutdown
 
 sudo shutdown -h now
+
+
+Copy from Raspberry to PC
+
+scp -r hassan@192.168.1.20:/home/hassan/lab/client/* D:\labo\projet\client\
+scp hassan@192.168.1.20:/home/hassan/lab/server.py D:\labo\projet\server\
+scp -r hassan@192.168.1.20:/home/hassan/lab/labs D:\labo\projet\server\
+
+Too
+
+scp hassan@192.168.1.20:/home/hassan/lab/server.py D:\labo\projet\server\
+scp -r hassan@192.168.1.20:/home/hassan/lab/labs D:\labo\projet\server\
+
+To GitHub (powershell)
+
+cd D:\labo\projet
+git add -A
+git commit -m "Add home page with logo, fullscreen client, Pi kiosk setup"
+git push
+
+From Browser to Raspberry:
+
+http://192.168.1.20:8080
+
+From Board to know password:
+
+grep password ~/.config/code-server/config.yaml
+

@@ -1,11 +1,13 @@
 import sys
 import os
+import theme
 import subprocess
 from PyQt5 import QtWidgets, QtGui, QtCore
 from network import Network
 from home_page import HomePage
 from panels.lab1_panel import Lab1
 from panels.lab2_panel import Lab2
+
 
 SERVER_HOST = "127.0.0.1"          # "127.0.0.1" on the Pi itself
 BASE = os.path.dirname(os.path.abspath(__file__)) + os.sep
@@ -104,6 +106,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 app = QtWidgets.QApplication(sys.argv)
 app.setStyle("Fusion")
+app.setStyleSheet(theme.STYLE)
 window = MainWindow()
 window.showFullScreen()
 sys.exit(app.exec_())

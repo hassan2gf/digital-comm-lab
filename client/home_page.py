@@ -1,8 +1,9 @@
+import subprocess
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 # ---------- 1. Texts to customize ----------
 TITLE = "Digital Communications Laboratory"
-SUBTITLE = "Faculty of Technology - Department of Electronics"
+SUBTITLE = ""
 LOGO_FILE = "assets/logo.png"
 
 # ---------- 2. Lab list: (key, title, description, ready) ----------
@@ -10,9 +11,9 @@ LABS = [
     ("lab1", "Lab 1 - Signals and Spectrum",
      "Periodic signals, spectrum and Fourier series", True),
     ("lab2", "Lab 2 - Line Coding",
-     "NRZ, RZ, Manchester, AMI, HDB3 and power spectral density", True),
-    ("lab3", "Lab 3 - Pulse Shaping",
-     "Raised cosine filter, intersymbol interference and eye diagram", False),
+     "NRZ, RZ, Manchester, Miller, AMI and HDB3", True),
+    ("lab3", "Lab 3 - Power Spectral Density",
+     "Spectrum of line codes, averaging and bandwidth", False),
     ("lab4", "Lab 4 - Digital Modulation",
      "ASK, PSK, FSK, QAM, constellation and bit error rate", False),
 ]
@@ -29,8 +30,8 @@ class LabCard(QtWidgets.QFrame):
         self.setFixedSize(430, 130)
         self.setCursor(QtCore.Qt.PointingHandCursor if ready else QtCore.Qt.ForbiddenCursor)
 
-        border = "#5a4a2a" if ready else "#2c323a"
-        background = "#1f2329" if ready else "#16191d"
+        border = "#5a4a2a" if ready else "#343c46"
+        background = "#242a32" if ready else "#1e232a"
         text_color = "#e6e8eb" if ready else "#59626b"
         self.setStyleSheet(
             "QFrame { background: %s; border: 1px solid %s; border-radius: 12px; }"
@@ -63,7 +64,6 @@ class HomePage(QtWidgets.QWidget):
 
     def __init__(self, base_path=""):
         super().__init__()
-        self.setStyleSheet("background: #12161a;")
 
         logo = QtWidgets.QLabel()
         logo.setAlignment(QtCore.Qt.AlignCenter)
@@ -75,11 +75,7 @@ class HomePage(QtWidgets.QWidget):
         title.setAlignment(QtCore.Qt.AlignCenter)
         title.setStyleSheet("font-size: 30px; font-weight: 600; color: #e6e8eb;")
 
-        subtitle = QtWidgets.QLabel(SUBTITLE)
-        subtitle.setAlignment(QtCore.Qt.AlignCenter)
-        subtitle.setStyleSheet("font-size: 16px; color: #9aa3ad;")
-
-        # cards on a two column grid
+        # ---------- cards on a two column grid ----------
         grid = QtWidgets.QGridLayout()
         grid.setSpacing(22)
         for index, (key, name, description, ready) in enumerate(LABS):
@@ -92,12 +88,31 @@ class HomePage(QtWidgets.QWidget):
         holder.addLayout(grid)
         holder.addStretch()
 
+        # ---------- shutdown button at the bottom right ----------
+        self.shutdown_button = QtWidgets.QPushButton("Shut down")
+        self.shutdown_button.setFixedWidth(130)
+        self.shutdown_button.clicked.connect(self.power_off)
+
+        bottom = QtWidgets.QHBoxLayout()
+        bottom.setContentsMargins(0, 0, 24, 18)
+        bottom.addStretch()
+        bottom.addWidget(self.shutdown_button)
+
+        # ---------- page layout ----------
         layout = QtWidgets.QVBoxLayout(self)
         layout.addStretch()
         layout.addWidget(logo)
         layout.addSpacing(18)
         layout.addWidget(title)
-        layout.addWidget(subtitle)
         layout.addSpacing(40)
         layout.addLayout(holder)
         layout.addStretch()
+        layout.addLayout(bottom)
+
+    def power_off(self):
+        answer = QtWidgets.QMessageBox.question(
+            self, "Shut down", "Turn off the device?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if answer == QtWidgets.QMessageBox.Yes:
+            subprocess.Popen(["sudo", "-n", "shutdown", "-h", "now"])
+            QtWidgets.QApplication.quit()

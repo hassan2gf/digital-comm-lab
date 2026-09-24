@@ -2,25 +2,22 @@ import numpy as np
 
 # ---------- 1. Default settings ----------
 DEFAULTS = {
-    "code": "nrz_polar",
+    "code": "ami",
     "amplitude": 1.0,
-    "bit_rate": 1000,           # bits per second
+    "bit_rate": 1000,
     "samples_per_bit": 20,
     "visible_bits": 16,
-    "source": "random",         # random or manual
+    "source": "manual",
     "sequence": "1011001011100101",
     "running": True,
-    "offset": 0,                # scrolling position inside one bit
-    "bits": [],                 # bits currently on screen, sent back by the client
-    "step": 4,                  # samples advanced per frame
-    "spectrum_bits": 128,       # block length used for the spectrum
-    "averaging": True,
-    "reset_average": False,
-    "scale": "db",              # db or linear
+    "step": 4,
+    "invert": False,
+    "show_clock": False,
+    "inject_error": False,
+    "bits": [],
+    "offset": 0,
+    "index": 0,
 }
-SPECTRUM_POINTS = 401           # frequency grid from 0 to 4 Rb
-
-_average = {"sum": None, "count": 0}     # kept between calls
 
 
 # ---------- 2. Bit source ----------
@@ -31,138 +28,162 @@ def next_bit(settings, index):
     return int(np.random.randint(0, 2))
 
 
-# ---------- 3. Line coders: bits -> levels, two half-bits each ----------
+# ---------- 3. Encoders: one level per half bit ----------
 def encode(bits, code, amplitude):
-    """Returns two levels per bit (first half, second half)."""
     first, second = [], []
-    polarity = 1                                  # for AMI and HDB3
-    previous = 0                                  # for NRZI
-    zero_run = 0                                  # for HDB3
-    since_pulse = 0                               # for HDB3 B rule
+    polarity = 1             # AMI and HDB3 alternate the pulse sign
+    last = 0                 # NRZI remembers the previous level
+    zeros = 0                # HDB3 counts consecutive zeros
+    pulses = 0               # HDB3 counts pulses since the last substitution
+    level = amplitude        # current level for the differential codes
+    previous_bit = None      # Miller needs the previous bit
+
     for bit in bits:
         if code == "nrz_unipolar":
-            level = amplitude if bit else 0.0
-            first.append(level); second.append(level)
+            value = amplitude if bit else 0.0
+            first.append(value); second.append(value)
         elif code == "nrz_polar":
-            level = amplitude if bit else -amplitude
-            first.append(level); second.append(level)
+            value = amplitude if bit else -amplitude
+            first.append(value); second.append(value)
         elif code == "nrzi":
             if bit:
-                previous = 1 - previous
-            level = amplitude if previous else -amplitude
-            first.append(level); second.append(level)
+                last = 1 - last
+            value = amplitude if last else -amplitude
+            first.append(value); second.append(value)
         elif code == "rz":
-            level = amplitude if bit else 0.0
-            first.append(level); second.append(0.0)
+            first.append(amplitude if bit else 0.0)
+            second.append(0.0)
         elif code == "manchester":
             high = amplitude if bit else -amplitude
             first.append(high); second.append(-high)
+        elif code == "manchester_diff":
+            if bit == 0:
+                level = -level                    # a zero starts with a transition
+            first.append(level); second.append(-level)
+            level = -level                        # mid-bit transition, always
+        elif code == "miller":
+            if bit == 1:
+                first.append(level); second.append(-level)
+                level = -level                    # transition in the middle
+            else:
+                if previous_bit == 0:
+                    level = -level                # transition between two zeros
+                first.append(level); second.append(level)
+            previous_bit = bit
         elif code == "ami":
             if bit:
-                level = amplitude * polarity
+                value = amplitude * polarity
                 polarity = -polarity
             else:
-                level = 0.0
-            first.append(level); second.append(level)
+                value = 0.0
+            first.append(value); second.append(value)
         else:                                     # hdb3
             if bit:
-                level = amplitude * polarity
+                value = amplitude * polarity
                 polarity = -polarity
-                zero_run = 0
-                since_pulse += 1
-                first.append(level); second.append(level)
+                pulses += 1
+                zeros = 0
+                first.append(value); second.append(value)
             else:
-                zero_run += 1
-                if zero_run == 4:
-                    # replace the fourth zero by a violation V
-                    if since_pulse % 2 == 0:
-                        # even number of pulses since last substitution: use B00V
-                        level_b = amplitude * polarity
-                        first[-3] = level_b; second[-3] = level_b   # B on the first zero
+                zeros += 1
+                if zeros == 4:
+                    if pulses % 2 == 0:           # even number of pulses: use B00V
+                        b_level = amplitude * polarity
+                        first[-3] = b_level; second[-3] = b_level
                         polarity = -polarity
-                    level_v = amplitude * (-polarity) * -1          # V keeps last polarity
-                    level_v = amplitude * polarity * -1
-                    first.append(level_v); second.append(level_v)
-                    zero_run = 0
-                    since_pulse = 0
+                    v_level = amplitude * -polarity   # V breaks the alternation
+                    first.append(v_level); second.append(v_level)
+                    zeros = 0
+                    pulses = 0
                 else:
                     first.append(0.0); second.append(0.0)
-    return np.array(first), np.array(second)
+    return np.array(first, dtype=float), np.array(second, dtype=float)
 
 
-def waveform(bits, settings):
-    """Builds the sampled waveform from the half-bit levels."""
-    spb = settings["samples_per_bit"]
-    first, second = encode(bits, settings["code"], settings["amplitude"])
-    half = spb // 2
-    shape = np.empty(len(bits) * spb)
-    for index in range(len(bits)):
-        start = index * spb
+# ---------- 4. Decoders: levels back to bits ----------
+def decode(first, second, code, amplitude):
+    threshold = amplitude / 2
+    bits = []
+    last = 0                 # NRZI
+    previous_end = None      # end level of the previous bit
+
+    for a, b in zip(first, second):
+        if code in ("nrz_unipolar", "rz"):
+            bits.append(1 if a > threshold else 0)
+        elif code == "nrz_polar":
+            bits.append(1 if a > 0 else 0)
+        elif code == "nrzi":
+            level = 1 if a > 0 else 0
+            bits.append(1 if level != last else 0)
+            last = level
+        elif code == "manchester":
+            bits.append(1 if a > b else 0)
+        elif code == "manchester_diff":
+            # a zero shows a transition at the start of the bit
+            if previous_end is None:
+                bits.append(1)
+            else:
+                bits.append(0 if abs(a - previous_end) > threshold else 1)
+        elif code == "miller":
+            # a one always shows a transition in the middle of the bit
+            bits.append(1 if abs(a - b) > threshold else 0)
+        else:                                     # ami and hdb3
+            bits.append(1 if abs(a) > threshold else 0)
+        previous_end = b
+    return bits
+
+
+# ---------- 5. Build the sampled waveforms ----------
+def waveform(first, second, samples_per_bit):
+    half = samples_per_bit // 2
+    shape = np.empty(len(first) * samples_per_bit)
+    for index in range(len(first)):
+        start = index * samples_per_bit
         shape[start:start + half] = first[index]
-        shape[start + half:start + spb] = second[index]
+        shape[start + half:start + samples_per_bit] = second[index]
     return shape
 
 
-# ---------- 4. Spectrum of the current code ----------
-def spectrum(settings):
-    length = settings["spectrum_bits"]
-    bits = [int(np.random.randint(0, 2)) for _ in range(length)] \
-        if settings["source"] == "random" else \
-        [next_bit(settings, i) for i in range(length)]
-
-    spb = settings["samples_per_bit"]
-    signal = waveform(bits, settings)
-    signal = signal - np.mean(signal) * 0          # keep the DC component visible
-
-    # frequency grid from 0 to 4 Rb
-    frequency = np.linspace(0, 4, SPECTRUM_POINTS)
-    step = 2 * np.pi * frequency / spb             # angle per sample
-    times = np.arange(len(signal))
-    matrix = np.exp(-1j * np.outer(step, times))
-    power = np.abs(matrix @ signal) ** 2 / (length * spb ** 2)
-
-    if settings["reset_average"] or _average["sum"] is None \
-            or len(_average["sum"]) != SPECTRUM_POINTS:
-        _average["sum"] = np.zeros(SPECTRUM_POINTS)
-        _average["count"] = 0
-    if settings["averaging"]:
-        _average["sum"] += power
-        _average["count"] += 1
-        power = _average["sum"] / _average["count"]
-    else:
-        _average["sum"] = power.copy()
-        _average["count"] = 1
-
-    peak = np.max(power) or 1.0
-    normalized = power / peak
-    if settings["scale"] == "db":
-        values = 10 * np.log10(np.maximum(normalized, 1e-6))
-    else:
-        values = normalized
-    return frequency, values, _average["count"]
+def message_shape(bits, samples_per_bit):
+    """The original binary message, drawn as a 0/1 waveform."""
+    return np.repeat(np.array(bits, dtype=float), samples_per_bit)
 
 
-# ---------- 5. Measurements ----------
-def measure(shape, bits, settings):
-    spb = settings["samples_per_bit"]
-    changes = np.nonzero(np.diff(np.sign(shape - np.mean(shape))))[0]
-    longest = 0
-    if len(shape):
-        transitions = np.nonzero(np.diff(shape))[0]
-        if len(transitions):
-            gaps = np.diff(np.concatenate(([0], transitions, [len(shape) - 1])))
-            longest = int(np.max(gaps)) / spb
-        else:
-            longest = len(shape) / spb
+def clock_shape(count, samples_per_bit):
+    """One clock period per bit: high then low."""
+    half = samples_per_bit // 2
+    single = np.concatenate([np.ones(half), np.zeros(samples_per_bit - half)])
+    return np.tile(single, count)
+
+
+# ---------- 6. Measurements ----------
+def measure(first, second, bits, amplitude):
+    levels = np.concatenate([first, second])
+
+    changes = 0
+    flat, longest = 0.0, 0.0
+    previous = None
+    for a, b in zip(first, second):
+        for value in (a, b):
+            if previous is not None and abs(value - previous) > 1e-9:
+                changes += 1
+                longest = max(longest, flat)
+                flat = 0.0
+            flat += 0.5
+            previous = value
+    longest = max(longest, flat)
+
     return {
-        "dc": round(float(np.mean(shape)), 4),
-        "power": round(float(np.mean(shape ** 2)), 4),
-        "longest_flat": round(longest, 2),
+        "levels": int(len(np.unique(np.round(levels, 6)))),
+        "dc": round(float(np.mean(levels)), 4),
+        "transitions": round(changes / max(len(bits), 1), 2),
+        "longest_flat": round(longest, 1),
         "ones": int(sum(bits)),
+        "total": len(bits),
     }
 
 
-# ---------- 6. Entry point ----------
+# ---------- 7. Entry point ----------
 def compute(settings):
     spb = settings["samples_per_bit"]
     visible = settings["visible_bits"]
@@ -171,7 +192,7 @@ def compute(settings):
     offset = int(settings["offset"])
     index = int(settings.get("index", 0))
 
-    if len(bits) != visible + 1:                   # first call or settings changed
+    if len(bits) != visible + 1:                  # first call or settings changed
         bits = [next_bit(settings, i) for i in range(visible + 1)]
         index = visible + 1
         offset = 0
@@ -183,19 +204,40 @@ def compute(settings):
             bits.append(next_bit(settings, index))
             index += 1
 
-    shape = waveform(bits, settings)[offset:offset + visible * spb]
-    frequency, values, count = spectrum(settings)
-    info = measure(shape, bits[:visible], settings)
-    info["averages"] = count
+    amplitude = settings["amplitude"]
+    first, second = encode(bits, settings["code"], amplitude)
+
+    # optional single error: one pulse is flipped
+    error_position = -1
+    if settings["inject_error"] and len(first) > 4:
+        error_position = len(first) // 2
+        first[error_position] = -first[error_position]
+        second[error_position] = -second[error_position]
+
+    # optional wire inversion
+    if settings["invert"]:
+        first, second = -first, -second
+
+    decoded = decode(first, second, settings["code"], amplitude)
+
+    window = slice(offset, offset + visible * spb)
+    code_wave = waveform(first, second, spb)[window]
+    message = message_shape(bits, spb)[window]
+    clock = clock_shape(len(bits), spb)[window].tolist() if settings["show_clock"] else None
+
+    info = measure(first, second, bits, amplitude)
     info["bit_rate"] = settings["bit_rate"]
+    info["decoded_ok"] = decoded[:visible] == bits[:visible]
 
     return {
-        "y": np.round(shape, 4).tolist(),
+        "message": np.round(message, 3).tolist(),
+        "code": np.round(code_wave, 4).tolist(),
+        "clock": clock,
         "bits": bits,
+        "decoded": decoded,
         "offset": offset,
         "index": index,
         "samples_per_bit": spb,
-        "frequency": np.round(frequency, 3).tolist(),
-        "spectrum": np.round(values, 3).tolist(),
+        "error_position": error_position,
         "measurements": info,
     }

@@ -1,14 +1,19 @@
 # ---------- 1. Colour palette ----------
 BACKGROUND = "#1e232a"      # window background
-PANEL = "#242a32"           # side panels
-SCREEN = "#0b0e10"          # oscilloscope screens (unchanged)
-BORDER = "#343c46"
+PANEL_TOP = "#2a313a"       # instrument panel, top of the gradient
+PANEL_BOTTOM = "#232932"    # instrument panel, bottom
+SCREEN = "#0b0e10"          # oscilloscope screens
+BORDER = "#39424d"
+EDGE = "#3d4650"            # light edge of the panel
 TEXT = "#e6e8eb"
 MUTED = "#9aa3ad"
-ACCENT = "#f5b84a"          # amber, for the main action
-GREEN = "#7cf29a"           # encoded signal
+DIM = "#6f7a84"
+ACCENT = "#f5b84a"          # amber
+ACCENT_DARK = "#33280f"     # background of a lit button
+GREEN = "#7cf29a"           # coded signal
 BLUE = "#5cc8ff"            # binary message
-RED = "#ff6b5e"             # errors
+RED = "#ff6b5e"
+FIELD = "#12161b"           # inputs and measurement cells
 
 # ---------- 2. Global stylesheet ----------
 STYLE = """
@@ -19,57 +24,91 @@ QWidget {
     font-size: 13px;
 }
 QLabel { background: transparent; }
+
+QWidget#panel {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 %(panel_top)s, stop:1 %(panel_bottom)s);
+    border-left: 1px solid %(edge)s;
+}
+QLabel#section {
+    color: %(dim)s;
+    font-size: 11px;
+    letter-spacing: 2px;
+}
+QFrame#rule { background: %(edge)s; max-height: 1px; }
+
 QPushButton {
-    background: #13161a;
-    border: 1px solid #353c45;
+    background: #171b21;
+    border: 1px solid %(border)s;
     border-radius: 7px;
-    padding: 7px 14px;
+    padding: 8px 14px;
     color: %(text)s;
 }
-QPushButton:hover { background: #1c2128; }
+QPushButton:hover { background: #1f242c; }
 QPushButton:pressed { background: #0f1215; }
+QPushButton:checked {
+    background: %(accent_dark)s;
+    border: 1px solid %(accent)s;
+    color: %(accent)s;
+}
 QPushButton#primary {
-    background: %(accent)s;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #f5c65f, stop:1 #e0a231);
+    border: 1px solid %(accent)s;
     color: #1b1f24;
-    border: none;
     font-weight: 600;
 }
-QPushButton#primary:hover { background: #ffc862; }
+QPushButton#primary:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #ffd27a, stop:1 #eeb143);
+}
+
 QComboBox, QLineEdit, QSpinBox, QDoubleSpinBox {
-    background: #13161a;
-    border: 1px solid #353c45;
+    background: %(field)s;
+    border: 1px solid %(border)s;
     border-radius: 6px;
-    padding: 5px 8px;
+    padding: 5px 9px;
     min-height: 22px;
     color: %(text)s;
 }
 QComboBox::drop-down { border: none; width: 18px; }
 QComboBox QAbstractItemView {
-    background: #13161a;
-    border: 1px solid #353c45;
-    selection-background-color: #2a2418;
+    background: %(field)s;
+    border: 1px solid %(border)s;
+    selection-background-color: %(accent_dark)s;
     color: %(text)s;
 }
+
 QCheckBox, QRadioButton { spacing: 8px; background: transparent; }
-QGroupBox {
-    border: 1px solid %(border)s;
-    border-radius: 8px;
-    margin-top: 12px;
-    padding-top: 10px;
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 16px; height: 16px;
+    border: 1px solid #5a6570;
+    background: #0f1215;
 }
-QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 12px;
-    padding: 0 5px;
-    color: %(muted)s;
+QCheckBox::indicator { border-radius: 4px; }
+QRadioButton::indicator { border-radius: 9px; }
+QCheckBox::indicator:hover, QRadioButton::indicator:hover {
+    border: 1px solid %(accent)s;
 }
+QCheckBox::indicator:checked {
+    background: %(accent)s; border: 1px solid %(accent)s;
+}
+
 QSlider::groove:horizontal {
-    height: 4px; background: #353c45; border-radius: 2px;
+    height: 6px; border-radius: 3px; background: #141820;
+}
+QSlider::sub-page:horizontal {
+    height: 6px; border-radius: 3px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #8a6a25, stop:1 %(accent)s);
 }
 QSlider::handle:horizontal {
-    background: %(accent)s; width: 14px; height: 14px;
-    margin: -6px 0; border-radius: 7px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #5a646f, stop:1 #2b323b);
+    border: 1px solid #6c7783;
+    width: 16px; height: 16px; margin: -6px 0; border-radius: 8px;
 }
+
 QTabWidget::pane { border: 1px solid %(border)s; border-radius: 8px; }
 QTabBar::tab {
     background: transparent; color: %(muted)s;
@@ -80,47 +119,31 @@ QTabBar::tab:selected {
     border-bottom: 2px solid %(accent)s;
 }
 QScrollArea { border: none; }
-QStatusBar { background: #0f1215; color: %(muted)s; }
-QFrame#card {
-    background: %(panel)s;
-    border: 1px solid %(border)s;
+QStatusBar { background: #171b21; color: %(muted)s; }
+
+QFrame#cell {
+    background: %(field)s;
+    border: 1px solid #2c323a;
+    border-radius: 7px;
+}
+QFrame#screen {
+    background: %(screen)s;
+    border: 1px solid #2c323a;
     border-radius: 8px;
 }
-QCheckBox::indicator, QRadioButton::indicator {
-    width: 16px;
-    height: 16px;
-    border: 1px solid #5a6570;
-    background: #0f1215;
-}
-QCheckBox::indicator { border-radius: 4px; }
-QRadioButton::indicator { border-radius: 9px; }
-QCheckBox::indicator:hover, QRadioButton::indicator:hover {
-    border: 1px solid %(accent)s;
-}
-QCheckBox::indicator:checked {
-    background: %(accent)s;
-    border: 1px solid %(accent)s;
-    image: none;
-}
-QRadioButton::indicator:checked {
-    background: qradialgradient(cx:0.5, cy:0.5, radius:0.5,
-                                stop:0 %(accent)s, stop:0.45 %(accent)s,
-                                stop:0.5 #0f1215, stop:1 #0f1215);
-    border: 1px solid %(accent)s;
-}
-""" % {"background": BACKGROUND, "panel": PANEL, "border": BORDER,
-       "text": TEXT, "muted": MUTED, "accent": ACCENT}
+""" % {"background": BACKGROUND, "panel_top": PANEL_TOP, "panel_bottom": PANEL_BOTTOM,
+       "screen": SCREEN, "border": BORDER, "edge": EDGE, "text": TEXT,
+       "muted": MUTED, "dim": DIM, "accent": ACCENT, "accent_dark": ACCENT_DARK,
+       "field": FIELD}
 
 
-# ---------- 3. Helper for oscilloscope screens ----------
+# ---------- 3. Dark look for pyqtgraph screens ----------
 def style_plot(plot, x_label, y_label):
-    """Applies the dark look to a pyqtgraph widget."""
     plot.setBackground(SCREEN)
-    plot.showGrid(x=True, y=True, alpha=0.25)
-    plot.setLabel("bottom", x_label, color=MUTED, size="10pt")
-    plot.setLabel("left", y_label, color=MUTED, size="10pt")
-    plot.getAxis("bottom").setPen(BORDER)
-    plot.getAxis("left").setPen(BORDER)
-    plot.getAxis("bottom").setTextPen(MUTED)
-    plot.getAxis("left").setTextPen(MUTED)
+    plot.showGrid(x=True, y=True, alpha=0.22)
+    plot.setLabel("bottom", x_label, color=DIM, size="9pt")
+    plot.setLabel("left", y_label, color=DIM, size="9pt")
+    for side in ("bottom", "left"):
+        plot.getAxis(side).setPen("#2c323a")
+        plot.getAxis(side).setTextPen(DIM)
     return plot

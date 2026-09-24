@@ -1,0 +1,22 @@
+To enter to Raspberry :
+
+ssh hassan@192.168.1.20
+
+
+To enabe Jupiter 
+sudo systemctl enable --now code-server@hassan
+
+To enter
+
+http://192.168.1.20:8080
+
+To update files on GitHub
+
+mkdir D:\labo\projet\pi-setup
+scp hassan@192.168.1.20:/home/hassan/.xinitrc D:\labo\projet\pi-setup\xinitrc
+scp hassan@192.168.1.20:/home/hassan/.bash_profile D:\labo\projet\pi-setup\bash_profile
+
+
+To shutdown
+
+sudo shutdown -h now
